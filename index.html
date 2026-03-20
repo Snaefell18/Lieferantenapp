@@ -1,0 +1,967 @@
+<!DOCTYPE html>
+
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FreshGo · Crew</title>
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+
+<!-- Firebase via compat (kein Modul = kein Scope-Problem) -->
+
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+<style>
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
+:root{
+  --bg:#f5f7f2;
+  --surface:#ffffff;
+  --ink:#111614;
+  --muted:#6b7c74;
+  --border:#e2e8e4;
+  --primary:#2d6a4f;
+  --primary-light:#e8f4ee;
+  --accent:#f4a261;
+  --accent-light:#fff4ec;
+  --danger:#e63946;
+  --danger-light:#fdecea;
+  --gold:#e9c46a;
+  --gold-light:#fdf8e8;
+  --shadow:0 2px 12px rgba(17,22,20,.07);
+  --shadow-md:0 6px 30px rgba(17,22,20,.11);
+}
+body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--ink);min-height:100vh;}
+.hide{display:none!important;}
+::-webkit-scrollbar{display:none;}
+
+/* LOADER */
+#loader{position:fixed;inset:0;background:var(--primary);display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:999;transition:opacity .4s ease;}
+.loader-logo{color:#fff;font-size:2.6rem;font-weight:800;letter-spacing:-.03em;margin-bottom:.3rem;}
+.loader-logo span{color:var(--gold);}
+.loader-sub{color:rgba(255,255,255,.5);font-size:.78rem;letter-spacing:.18em;text-transform:uppercase;margin-bottom:2.5rem;}
+.loader-dots{display:flex;gap:.5rem;}
+.loader-dots span{width:8px;height:8px;border-radius:50%;background:rgba(255,255,255,.3);animation:dotBounce 1.2s ease-in-out infinite;}
+.loader-dots span:nth-child(2){animation-delay:.2s;}
+.loader-dots span:nth-child(3){animation-delay:.4s;}
+@keyframes dotBounce{0%,80%,100%{transform:scale(.8);opacity:.3}40%{transform:scale(1.2);opacity:1}}
+
+/* TOAST */
+#toast{position:fixed;top:1rem;left:50%;transform:translateX(-50%) translateY(-130%);background:var(--ink);color:#fff;padding:.85rem 1.4rem;border-radius:14px;z-index:9999;font-size:.85rem;font-weight:500;transition:transform .3s cubic-bezier(.2,.8,.2,1);max-width:92vw;text-align:center;box-shadow:var(--shadow-md);pointer-events:none;}
+#toast.show{transform:translateX(-50%) translateY(0);}
+#toast.error{background:var(--danger);}
+#toast.success{background:var(--primary);}
+
+/* ── AUTH SCREEN ── */
+#auth-screen{min-height:100vh;background:var(--primary);display:flex;flex-direction:column;align-items:center;justify-content:center;padding:1.5rem;}
+.auth-card{background:#fff;border-radius:28px;padding:2.2rem 1.8rem 2.5rem;width:100%;max-width:360px;box-shadow:var(--shadow-md);}
+.auth-brand{font-size:2rem;font-weight:800;letter-spacing:-.04em;margin-bottom:.25rem;text-align:center;}
+.auth-brand span{color:var(--primary);}
+.auth-tagline{text-align:center;color:var(--muted);font-size:.82rem;margin-bottom:1.8rem;}
+.auth-label{font-size:.75rem;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:.4rem;display:block;}
+.auth-input{width:100%;padding:.85rem 1rem;border:2px solid var(--border);border-radius:12px;font-family:'Sora',sans-serif;font-size:.9rem;background:var(--bg);outline:none;transition:border .2s;margin-bottom:.7rem;}
+.auth-input:focus{border-color:var(--primary);}
+.auth-divider{display:flex;align-items:center;gap:.8rem;margin:1.2rem 0;color:var(--muted);font-size:.75rem;}
+.auth-divider::before,.auth-divider::after{content:'';flex:1;height:1px;background:var(--border);}
+.btn{display:flex;align-items:center;justify-content:center;gap:.6rem;padding:.9rem 1.2rem;border-radius:14px;font-family:'Sora',sans-serif;font-weight:600;font-size:.9rem;border:none;cursor:pointer;transition:all .18s;width:100%;}
+.btn:active{transform:scale(.97);}
+.btn:disabled{opacity:.5;cursor:not-allowed;}
+.btn-primary{background:var(--primary);color:#fff;}
+.btn-primary:hover:not(:disabled){background:#235c43;}
+.btn-white{background:#fff;color:var(--ink);border:2px solid var(--border);}
+.btn-white:hover{border-color:#aaa;background:var(--bg);}
+.btn-accent{background:var(--accent);color:#fff;}
+.btn-accent:hover{background:#e08a45;}
+.btn-danger{background:var(--danger);color:#fff;}
+.btn-sm{padding:.55rem 1rem;font-size:.78rem;border-radius:10px;width:auto;}
+.btn-ghost{background:rgba(255,255,255,.12);color:#fff;border:1.5px solid rgba(255,255,255,.2);}
+.btn-ghost:hover{background:rgba(255,255,255,.2);}
+
+/* ── ROLE SCREEN ── */
+#role-screen{min-height:100vh;background:var(--primary);display:flex;flex-direction:column;}
+.role-header{padding:1.3rem 1.4rem;display:flex;justify-content:space-between;align-items:center;}
+.role-brand{color:#fff;font-size:1.4rem;font-weight:800;letter-spacing:-.03em;}
+.role-brand span{color:var(--gold);}
+.role-body{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:1.5rem;gap:1rem;}
+.role-headline{color:#fff;font-size:1.5rem;font-weight:700;text-align:center;margin-bottom:.3rem;}
+.role-sub{color:rgba(255,255,255,.5);font-size:.83rem;text-align:center;margin-bottom:1.2rem;}
+.role-card{width:100%;max-width:320px;background:#fff;border-radius:22px;padding:1.6rem;cursor:pointer;transition:all .22s;box-shadow:var(--shadow-md);}
+.role-card:hover{transform:translateY(-3px);box-shadow:0 12px 40px rgba(0,0,0,.18);}
+.role-card:active{transform:scale(.98);}
+.role-icon{font-size:2.4rem;margin-bottom:.8rem;}
+.role-title{font-size:1.1rem;font-weight:700;margin-bottom:.25rem;}
+.role-desc{font-size:.8rem;color:var(--muted);}
+
+/* ── APP SHELL ── */
+.shell{min-height:100vh;display:flex;flex-direction:column;}
+.app-bar{background:var(--primary);padding:1rem 1.2rem;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100;}
+.app-bar-left{display:flex;align-items:center;gap:.75rem;}
+.app-bar-title{color:#fff;font-size:1.1rem;font-weight:700;}
+.app-bar-sub{color:rgba(255,255,255,.5);font-size:.72rem;}
+.icon-btn{width:36px;height:36px;border-radius:10px;background:rgba(255,255,255,.12);border:none;color:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:background .2s;}
+.icon-btn:hover{background:rgba(255,255,255,.22);}
+.icon-btn svg{width:18px;height:18px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;}
+.badge{background:var(--accent);color:#fff;font-size:.68rem;font-weight:700;padding:.2rem .55rem;border-radius:999px;display:inline-block;}
+.badge.green{background:var(--primary);}
+.badge.gold{background:var(--gold);color:var(--ink);}
+
+/* TABS */
+.tab-nav{display:flex;background:var(--ink);position:sticky;top:64px;z-index:99;}
+.tab-btn{flex:1;padding:.85rem .4rem .7rem;display:flex;flex-direction:column;align-items:center;gap:.22rem;color:rgba(255,255,255,.35);background:none;border:none;cursor:pointer;font-family:'Sora',sans-serif;font-size:.62rem;font-weight:600;letter-spacing:.06em;text-transform:uppercase;border-bottom:2.5px solid transparent;transition:all .2s;}
+.tab-btn svg{width:20px;height:20px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;}
+.tab-btn.active{color:#fff;border-bottom-color:var(--gold);}
+.tab-pane{display:none;flex:1;overflow-y:auto;padding:1.1rem;}
+.tab-pane.active{display:block;}
+
+/* CARDS */
+.card{background:var(--surface);border-radius:18px;border:1.5px solid var(--border);box-shadow:var(--shadow);margin-bottom:.9rem;overflow:hidden;}
+.card-header{padding:.9rem 1.1rem .7rem;display:flex;justify-content:space-between;align-items:flex-start;border-bottom:1px solid var(--border);}
+.card-body{padding:1rem 1.1rem;}
+.card-footer{padding:.8rem 1.1rem;background:var(--bg);display:flex;align-items:center;justify-content:space-between;gap:.6rem;flex-wrap:wrap;}
+
+/* STATUS CHIPS */
+.chip{display:inline-flex;align-items:center;gap:.3rem;padding:.28rem .7rem;border-radius:999px;font-size:.72rem;font-weight:700;}
+.chip.green{background:var(--primary-light);color:var(--primary);}
+.chip.orange{background:var(--accent-light);color:#c47030;}
+.chip.red{background:var(--danger-light);color:var(--danger);}
+.chip.gray{background:var(--border);color:var(--muted);}
+.chip.gold{background:var(--gold-light);color:#8a6800;}
+.dot{width:6px;height:6px;border-radius:50%;display:inline-block;flex-shrink:0;}
+.dot.pulse{animation:pulse 1.5s ease-in-out infinite;}
+@keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.4;transform:scale(1.5)}}
+
+/* EARNING BOX */
+.earn-box{background:linear-gradient(135deg,var(--primary) 0%,#1a4a34 100%);border-radius:20px;padding:1.4rem;margin-bottom:1.1rem;display:flex;justify-content:space-between;align-items:center;}
+.earn-box .amount{color:#fff;font-size:2rem;font-weight:800;letter-spacing:-.03em;}
+.earn-box .sub{color:rgba(255,255,255,.5);font-size:.74rem;margin-top:.1rem;}
+.earn-box .icon{font-size:2.2rem;opacity:.7;}
+
+/* MAP */
+.map-wrap{height:180px;border-radius:12px;overflow:hidden;margin:.7rem 0;border:1.5px solid var(--border);}
+.map-wrap-lg{height:280px;border-radius:16px;overflow:hidden;border:1.5px solid var(--border);}
+.leaflet-container{z-index:1!important;}
+
+/* MENU ITEM ROW */
+.menu-row{display:flex;align-items:center;gap:.8rem;padding:.85rem 0;border-bottom:1px solid var(--border);}
+.menu-row:last-child{border:none;}
+.menu-row .em{font-size:1.4rem;width:34px;text-align:center;flex-shrink:0;}
+.menu-row .info{flex:1;min-width:0;}
+.menu-row .info .nm{font-weight:600;font-size:.88rem;}
+.menu-row .info .ct{font-size:.73rem;color:var(--muted);}
+.menu-row .pr{font-weight:700;font-size:.9rem;white-space:nowrap;margin-right:.4rem;}
+.del-btn{width:28px;height:28px;border-radius:8px;background:var(--danger-light);color:var(--danger);border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:.85rem;flex-shrink:0;transition:background .2s;}
+.del-btn:hover{background:var(--danger);color:#fff;}
+
+/* STAT BOXES */
+.stat-grid{display:grid;grid-template-columns:1fr 1fr;gap:.8rem;margin-bottom:1rem;}
+.stat-box{background:var(--surface);border-radius:16px;border:1.5px solid var(--border);padding:1rem;box-shadow:var(--shadow);}
+.stat-box .val{font-size:1.7rem;font-weight:800;letter-spacing:-.03em;}
+.stat-box .lbl{font-size:.7rem;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.06em;margin-top:.1rem;}
+
+/* MODAL */
+.modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:500;display:flex;align-items:flex-end;justify-content:center;}
+.modal{background:#fff;border-radius:24px 24px 0 0;padding:1.4rem 1.4rem 2rem;width:100%;max-width:480px;max-height:92vh;overflow-y:auto;}
+.modal-title{font-size:1.2rem;font-weight:700;margin-bottom:.3rem;}
+
+/* FORM */
+.form-group{margin-bottom:.7rem;}
+.form-label{font-size:.72rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;display:block;margin-bottom:.3rem;}
+.form-input{width:100%;padding:.8rem 1rem;border:2px solid var(--border);border-radius:12px;font-family:'Sora',sans-serif;font-size:.88rem;background:var(--bg);outline:none;transition:border .2s;}
+.form-input:focus{border-color:var(--primary);}
+.form-row{display:grid;grid-template-columns:1fr 1fr;gap:.6rem;}
+.full{grid-column:1/-1;}
+
+/* EMPTY */
+.empty{text-align:center;padding:2.5rem 1rem;color:var(--muted);}
+.empty .ei{font-size:2.5rem;margin-bottom:.7rem;opacity:.5;}
+.empty p{font-size:.85rem;}
+
+/* SECTION LABEL */
+.section-label{font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);margin-bottom:.6rem;margin-top:1rem;}
+.section-label:first-child{margin-top:0;}
+</style>
+
+</head>
+<body>
+
+<!-- LOADER -->
+
+<div id="loader">
+  <div class="loader-logo">Fresh<span>Go</span></div>
+  <div class="loader-sub">Crew & Partner</div>
+  <div class="loader-dots">
+    <span></span><span></span><span></span>
+  </div>
+</div>
+
+<!-- TOAST -->
+
+<div id="toast"></div>
+
+<!-- ═══════════════════ AUTH ═══════════════════ -->
+
+<div id="auth-screen" class="hide">
+  <div class="auth-card">
+    <div class="auth-brand">Fresh<span>Go</span></div>
+    <div class="auth-tagline">Crew-Portal · Lieferanten & Restaurants</div>
+
+```
+<!-- Google -->
+<button class="btn btn-white" id="btn-google">
+  <svg width="18" height="18" viewBox="0 0 48 48">
+    <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/>
+    <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/>
+    <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/>
+    <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/>
+  </svg>
+  Mit Google anmelden
+</button>
+
+<div class="auth-divider">oder mit E-Mail</div>
+
+<input class="auth-input" type="email" id="in-email" placeholder="E-Mail-Adresse">
+<input class="auth-input" type="password" id="in-pw" placeholder="Passwort (mind. 6 Zeichen)">
+<button class="btn btn-primary" id="btn-email">Einloggen / Registrieren</button>
+
+<p id="auth-error" style="color:var(--danger);font-size:.78rem;margin-top:.8rem;text-align:center;display:none;"></p>
+```
+
+  </div>
+</div>
+
+<!-- ═══════════════════ ROLE ═══════════════════ -->
+
+<div id="role-screen" class="hide">
+  <div class="role-header">
+    <div class="role-brand">Fresh<span>Go</span></div>
+    <div style="display:flex;gap:.5rem;align-items:center;">
+      <span id="role-user" style="color:rgba(255,255,255,.6);font-size:.78rem;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"></span>
+      <button class="btn btn-ghost btn-sm" id="btn-role-logout">Logout</button>
+    </div>
+  </div>
+  <div class="role-body">
+    <div class="role-headline">Was machst du heute?</div>
+    <div class="role-sub">Wähle deine Rolle</div>
+    <div class="role-card" id="btn-driver">
+      <div class="role-icon">🛵</div>
+      <div class="role-title">Ich liefere</div>
+      <div class="role-desc">Bestellungen annehmen, ausliefern & Geld verdienen</div>
+    </div>
+    <div class="role-card" id="btn-restaurant">
+      <div class="role-icon">🏪</div>
+      <div class="role-title">Ich bin Restaurant</div>
+      <div class="role-desc">Sortiment pflegen & Bestellungen verwalten</div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════ DRIVER SHELL ═══════════════════ -->
+
+<div id="driver-shell" class="shell hide">
+  <div class="app-bar">
+    <div class="app-bar-left">
+      <button class="icon-btn" id="btn-driver-back">
+        <svg viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg>
+      </button>
+      <div>
+        <div class="app-bar-title">FreshGo Lieferant</div>
+        <div class="app-bar-sub" id="driver-name-bar"></div>
+      </div>
+    </div>
+    <div style="display:flex;align-items:center;gap:.5rem;">
+      <span class="badge gold" id="driver-balance-badge">0,00 €</span>
+      <button class="icon-btn" id="btn-driver-logout" title="Logout">
+        <svg viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+      </button>
+    </div>
+  </div>
+
+  <div class="tab-nav">
+    <button class="tab-btn active" data-target="tab-open">
+      <svg viewBox="0 0 24 24"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
+      Verfügbar
+    </button>
+    <button class="tab-btn" data-target="tab-active">
+      <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+      Aktiv
+    </button>
+    <button class="tab-btn" data-target="tab-wallet">
+      <svg viewBox="0 0 24 24"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20"/></svg>
+      Verdienst
+    </button>
+  </div>
+
+  <div id="tab-open" class="tab-pane active">
+    <div id="open-list"><div class="empty"><div class="ei">📭</div><p>Keine offenen Bestellungen</p></div></div>
+  </div>
+  <div id="tab-active" class="tab-pane">
+    <div id="active-list"><div class="empty"><div class="ei">🛵</div><p>Du hast gerade keine aktiven Lieferungen</p></div></div>
+  </div>
+  <div id="tab-wallet" class="tab-pane">
+    <div class="earn-box">
+      <div>
+        <div style="color:rgba(255,255,255,.5);font-size:.72rem;text-transform:uppercase;letter-spacing:.1em;margin-bottom:.3rem;">Dein Guthaben</div>
+        <div class="amount" id="wallet-total">0,00 €</div>
+        <div class="sub">Du erhältst 40 % jeder Lieferung</div>
+      </div>
+      <div class="icon">💰</div>
+    </div>
+    <div class="section-label">Abgeschlossene Lieferungen</div>
+    <div class="card"><div class="card-body" id="wallet-list"><div class="empty" style="padding:.5rem 0;"><div class="ei" style="font-size:1.8rem;">🏁</div><p>Noch keine Lieferungen</p></div></div></div>
+  </div>
+</div>
+
+<!-- MAP MODAL (Lieferant) -->
+
+<div id="map-modal" class="modal-bg hide">
+  <div class="modal">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.8rem;">
+      <div class="modal-title">Route zur Lieferadresse</div>
+      <button onclick="closeModal()" style="background:none;border:none;font-size:1.3rem;color:var(--muted);cursor:pointer;">✕</button>
+    </div>
+    <div id="modal-map" class="map-wrap-lg"></div>
+    <div id="modal-addr" style="font-size:.83rem;color:var(--muted);background:var(--bg);padding:.8rem;border-radius:10px;margin:.7rem 0;"></div>
+    <div style="display:flex;gap:.6rem;">
+      <button class="btn btn-primary" id="btn-confirm-delivery" style="flex:1;">✓ Als geliefert bestätigen</button>
+      <button class="btn btn-white btn-sm" onclick="closeModal()">Schließen</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════ RESTAURANT SHELL ═══════════════════ -->
+
+<div id="restaurant-shell" class="shell hide">
+  <div class="app-bar">
+    <div class="app-bar-left">
+      <button class="icon-btn" id="btn-rest-back">
+        <svg viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg>
+      </button>
+      <div>
+        <div class="app-bar-title">FreshGo Restaurant</div>
+        <div class="app-bar-sub" id="rest-name-bar"></div>
+      </div>
+    </div>
+    <div style="display:flex;align-items:center;gap:.5rem;">
+      <span class="badge" id="rest-new-badge" style="display:none;">0</span>
+      <button class="icon-btn" id="btn-rest-logout" title="Logout">
+        <svg viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+      </button>
+    </div>
+  </div>
+
+  <div class="tab-nav">
+    <button class="tab-btn active" data-target="tab-rest-orders">
+      <svg viewBox="0 0 24 24"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
+      Bestellungen
+    </button>
+    <button class="tab-btn" data-target="tab-rest-menu">
+      <svg viewBox="0 0 24 24"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
+      Sortiment
+    </button>
+    <button class="tab-btn" data-target="tab-rest-stats">
+      <svg viewBox="0 0 24 24"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+      Statistik
+    </button>
+  </div>
+
+  <div id="tab-rest-orders" class="tab-pane active">
+    <div id="rest-orders-list"><div class="empty"><div class="ei">📭</div><p>Keine Bestellungen</p></div></div>
+  </div>
+
+  <div id="tab-rest-menu" class="tab-pane">
+    <div class="card" style="margin-bottom:.9rem;">
+      <div class="card-body">
+        <label class="form-label">Café auswählen</label>
+        <select class="form-input" id="sel-cafe">
+          <option value="junge">Stadtbäckerei Junge</option>
+          <option value="double">Double Coffee</option>
+        </select>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-body">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.8rem;">
+          <span class="form-label" style="margin:0;">Artikel (<span id="menu-count">0</span>)</span>
+        </div>
+        <div id="menu-list"></div>
+      </div>
+    </div>
+
+```
+<div class="card" style="margin-top:.9rem;">
+  <div class="card-body">
+    <div style="font-size:1rem;font-weight:700;margin-bottom:.9rem;">+ Neuer Artikel</div>
+    <div class="form-group full">
+      <label class="form-label">Name *</label>
+      <input class="form-input" id="new-name" placeholder="z.B. Hafermilch Latte">
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label">Emoji</label>
+        <input class="form-input" id="new-emoji" placeholder="☕">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Preis (€) *</label>
+        <input class="form-input" type="number" id="new-price" placeholder="3.90" step="0.10" min="0">
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label">Kategorie</label>
+        <input class="form-input" id="new-cat" placeholder="Kaffee">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Beschreibung</label>
+        <input class="form-input" id="new-desc" placeholder="Kurz & knapp">
+      </div>
+    </div>
+    <button class="btn btn-primary" id="btn-add-item">Hinzufügen</button>
+  </div>
+</div>
+```
+
+  </div>
+
+  <div id="tab-rest-stats" class="tab-pane">
+    <div class="stat-grid">
+      <div class="stat-box"><div class="val" id="s-total">0</div><div class="lbl">Bestellungen</div></div>
+      <div class="stat-box"><div class="val" id="s-revenue">0 €</div><div class="lbl">Umsatz</div></div>
+      <div class="stat-box"><div class="val" id="s-active">0</div><div class="lbl">Aktiv</div></div>
+      <div class="stat-box"><div class="val" id="s-done">0</div><div class="lbl">Geliefert</div></div>
+    </div>
+    <div class="section-label">Letzte Bestellungen</div>
+    <div class="card"><div class="card-body" id="stat-list"></div></div>
+  </div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════════════
+// FIREBASE INIT
+// ═══════════════════════════════════════════════════════════
+const fbConfig = {
+  apiKey: "AIzaSyBddDHPUptynMcVWvDKGVQOnTNwitujCEg",
+  authDomain: "kaffee-544f4.firebaseapp.com",
+  projectId: "kaffee-544f4",
+  storageBucket: "kaffee-544f4.firebasestorage.app",
+  messagingSenderId: "1082256261108",
+  appId: "1:1082256261108:web:374edc340875e48ecb83a1"
+};
+firebase.initializeApp(fbConfig);
+const auth = firebase.auth();
+const db   = firebase.firestore();
+const APP  = 'coffee-drop-app';
+const CUT  = 0.40;
+
+// ─── HELPERS ─────────────────────────────────────────────
+const $  = id => document.getElementById(id);
+const show = id => $(id).classList.remove('hide');
+const hide = id => $(id).classList.add('hide');
+const fmt  = n  => (+(n||0)).toFixed(2).replace('.',',') + ' €';
+const fmtDate = iso => { if(!iso) return '–'; const d=new Date(iso); return d.toLocaleDateString('de-DE')+' '+d.toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'}); };
+
+let toastTimer;
+function toast(msg, type='') {
+  const el = $('toast');
+  el.textContent = msg;
+  el.className = 'show' + (type ? ' '+type : '');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.remove('show'), 3800);
+}
+
+function showErr(msg) {
+  const el = $('auth-error');
+  el.textContent = msg;
+  el.style.display = msg ? 'block' : 'none';
+}
+
+// ─── SCREENS ─────────────────────────────────────────────
+function showScreen(id) {
+  ['loader','auth-screen','role-screen','driver-shell','restaurant-shell'].forEach(hide);
+  show(id);
+}
+
+// ─── TABS ────────────────────────────────────────────────
+document.querySelectorAll('.tab-btn[data-target]').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const shell = btn.closest('.shell');
+    shell.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    shell.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
+    btn.classList.add('active');
+    const pane = $(btn.dataset.target);
+    if (pane) pane.classList.add('active');
+  });
+});
+
+// ═══════════════════════════════════════════════════════════
+// AUTH
+// ═══════════════════════════════════════════════════════════
+$('btn-google').addEventListener('click', () => {
+  showErr('');
+  $('btn-google').disabled = true;
+  $('btn-google').textContent = 'Einen Moment...';
+  const provider = new firebase.auth.GoogleAuthProvider();
+  auth.signInWithPopup(provider)
+    .catch(e => {
+      showErr('Google-Login fehlgeschlagen: ' + e.message);
+      $('btn-google').disabled = false;
+      $('btn-google').innerHTML = `<svg width="18" height="18" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg> Mit Google anmelden`;
+    });
+});
+
+$('btn-email').addEventListener('click', () => {
+  const email = $('in-email').value.trim();
+  const pw    = $('in-pw').value;
+  showErr('');
+  if (!email || !pw) return showErr('Bitte E-Mail und Passwort eingeben.');
+  if (pw.length < 6) return showErr('Passwort muss mindestens 6 Zeichen haben.');
+  $('btn-email').disabled = true;
+  $('btn-email').textContent = '...';
+  auth.signInWithEmailAndPassword(email, pw)
+    .catch(() => {
+      auth.createUserWithEmailAndPassword(email, pw)
+        .catch(e => showErr(e.message))
+        .finally(() => { $('btn-email').disabled = false; $('btn-email').textContent = 'Einloggen / Registrieren'; });
+    })
+    .finally(() => { $('btn-email').disabled = false; $('btn-email').textContent = 'Einloggen / Registrieren'; });
+});
+
+function doLogout() { cleanup(); auth.signOut(); }
+$('btn-role-logout').addEventListener('click', doLogout);
+$('btn-driver-logout').addEventListener('click', doLogout);
+$('btn-rest-logout').addEventListener('click', doLogout);
+$('btn-driver-back').addEventListener('click', () => { cleanup(); showScreen('role-screen'); });
+$('btn-rest-back').addEventListener('click', () => { cleanup(); showScreen('role-screen'); });
+
+// ─── AUTH STATE ──────────────────────────────────────────
+auth.onAuthStateChanged(user => {
+  hide('loader');
+  if (user) {
+    currentUser = user;
+    $('role-user').textContent = user.displayName || user.email;
+    showScreen('role-screen');
+  } else {
+    currentUser = null;
+    showScreen('auth-screen');
+  }
+});
+
+// Loader nach 3s ausblenden falls auth nicht reagiert
+setTimeout(() => { if (!$('loader').classList.contains('hide')) { hide('loader'); show('auth-screen'); } }, 3000);
+
+// ═══════════════════════════════════════════════════════════
+// GLOBAL STATE
+// ═══════════════════════════════════════════════════════════
+let currentUser = null;
+let unsubs = [];
+function cleanup() { unsubs.forEach(u => { try{u()}catch{} }); unsubs = []; }
+
+$('btn-driver').addEventListener('click', () => { startDriver(); showScreen('driver-shell'); });
+$('btn-restaurant').addEventListener('click', () => { startRestaurant(); showScreen('restaurant-shell'); });
+
+// ═══════════════════════════════════════════════════════════
+// ─── DRIVER ─────────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════
+function startDriver() {
+  cleanup();
+  const name = currentUser.displayName || currentUser.email;
+  $('driver-name-bar').textContent = name;
+
+  const ref = db.collection('artifacts').doc(APP).collection('public_orders');
+
+  const u = ref.onSnapshot(snap => {
+    const all = [];
+    snap.forEach(d => all.push({ id: d.id, ...d.data() }));
+    all.sort((a,b) => new Date(b.createdAt||0) - new Date(a.createdAt||0));
+
+    const open   = all.filter(o => o.status === 'aktiv' && !o.driverId);
+    const active = all.filter(o => o.driverId === currentUser.uid && o.status !== 'geliefert');
+    const done   = all.filter(o => o.driverId === currentUser.uid && o.status === 'geliefert');
+
+    renderOpenOrders(open);
+    renderActiveOrders(active);
+    renderWallet(done);
+  }, e => toast('Fehler: ' + e.message, 'error'));
+
+  unsubs.push(u);
+}
+
+// ─── RENDER OPEN ─────────────────────────────────────────
+function renderOpenOrders(orders) {
+  const el = $('open-list');
+  if (!orders.length) {
+    el.innerHTML = '<div class="empty"><div class="ei">📭</div><p>Keine offenen Bestellungen gerade</p></div>';
+    return;
+  }
+  el.innerHTML = orders.map(o => {
+    const earn  = o.totalPrice * CUT;
+    const items = Object.entries(o.items||{}).map(([n,i]) => `${i.quantity}x ${n}`).join(', ');
+    return `<div class="card">
+      <div class="card-header">
+        <div>
+          <div style="font-size:.7rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;margin-bottom:.2rem;">${o.cafe||'Bestellung'}</div>
+          <div style="font-weight:700;font-size:1.05rem;">${fmt(o.totalPrice)}</div>
+          <div style="font-size:.74rem;color:var(--muted);margin-top:.1rem;">${fmtDate(o.createdAt)}</div>
+        </div>
+        <div style="background:var(--gold-light);border:1.5px solid var(--gold);color:#7a5e00;border-radius:12px;padding:.4rem .9rem;font-weight:700;font-size:.88rem;text-align:center;">
+          💰 ${fmt(earn)}<div style="font-size:.64rem;font-weight:400;opacity:.7;">dein Anteil</div>
+        </div>
+      </div>
+      <div class="card-body" style="font-size:.84rem;color:#555;padding:.8rem 1.1rem;">${items||'–'}</div>
+      <div class="map-wrap" style="margin:.3rem .9rem .5rem;"><div id="map-o-${o.id}" style="height:100%;"></div></div>
+      <div class="card-footer">
+        <div style="font-size:.79rem;color:var(--muted);flex:1;">📍 ${o.address||'Keine Adresse'}</div>
+        <button class="btn btn-primary btn-sm" data-accept="${o.id}" data-uid="${o.userId||''}">Annehmen →</button>
+      </div>
+    </div>`;
+  }).join('');
+
+  // Mini-Maps
+  orders.forEach(o => {
+    if (o.address) geocodeAndDraw('map-o-' + o.id, o.address, false);
+  });
+
+  el.querySelectorAll('[data-accept]').forEach(btn => {
+    btn.addEventListener('click', () => acceptOrder(btn.dataset.accept, btn.dataset.uid, btn));
+  });
+}
+
+async function acceptOrder(orderId, userId, btn) {
+  btn.disabled = true; btn.textContent = '...';
+  try {
+    await db.collection('artifacts').doc(APP).collection('public_orders').doc(orderId).update({
+      driverId: currentUser.uid,
+      driverName: currentUser.displayName || currentUser.email,
+      acceptedAt: new Date().toISOString(),
+      status: 'unterwegs'
+    });
+    // Mirror in User-Orders
+    if (userId) {
+      db.collection('artifacts').doc(APP).collection('users').doc(userId)
+        .collection('orders').doc(orderId)
+        .update({ status: 'unterwegs', driverName: currentUser.displayName || currentUser.email })
+        .catch(()=>{});
+    }
+    toast('✅ Bestellung angenommen! Jetzt losfahren.', 'success');
+  } catch(e) {
+    toast('Fehler: ' + e.message, 'error');
+    btn.disabled = false; btn.textContent = 'Annehmen →';
+  }
+}
+
+// ─── RENDER ACTIVE ────────────────────────────────────────
+let modalOrderId = null, modalUserId = null, modalEarn = 0, modalLeaflet = null;
+
+function renderActiveOrders(orders) {
+  const el = $('active-list');
+  if (!orders.length) {
+    el.innerHTML = '<div class="empty"><div class="ei">🛵</div><p>Keine aktiven Lieferungen</p></div>';
+    return;
+  }
+  el.innerHTML = orders.map(o => {
+    const earn  = o.totalPrice * CUT;
+    const items = Object.entries(o.items||{}).map(([n,i]) => `${i.quantity}x ${n}`).join(', ');
+    return `<div class="card">
+      <div class="card-header">
+        <div>
+          <div style="font-size:.7rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;margin-bottom:.2rem;">${o.cafe||'Bestellung'}</div>
+          <div style="font-weight:700;font-size:1.05rem;">${fmt(o.totalPrice)}</div>
+        </div>
+        <div class="chip orange"><span class="dot pulse" style="background:var(--accent)"></span> Unterwegs</div>
+      </div>
+      <div class="card-body" style="font-size:.84rem;color:#555;padding:.8rem 1.1rem;">${items}</div>
+      <div class="map-wrap" style="margin:.3rem .9rem .5rem;"><div id="map-a-${o.id}" style="height:100%;"></div></div>
+      <div class="card-footer">
+        <div style="font-size:.79rem;color:var(--muted);flex:1;">📍 ${o.address||''}</div>
+        <button class="btn btn-primary btn-sm" data-modal="${o.id}" data-uid="${o.userId||''}" data-earn="${earn}" data-addr="${(o.address||'').replace(/"/g,'&quot;')}">Karte & Liefern</button>
+      </div>
+    </div>`;
+  }).join('');
+
+  orders.forEach(o => {
+    if (o.address) geocodeAndDraw('map-a-' + o.id, o.address, false);
+  });
+
+  el.querySelectorAll('[data-modal]').forEach(btn => {
+    btn.addEventListener('click', () => openDeliveryModal(btn.dataset.modal, btn.dataset.uid, btn.dataset.addr, parseFloat(btn.dataset.earn||0)));
+  });
+}
+
+function openDeliveryModal(orderId, userId, address, earn) {
+  modalOrderId = orderId; modalUserId = userId; modalEarn = earn;
+  $('modal-addr').textContent = '📍 ' + address;
+  show('map-modal');
+  setTimeout(() => {
+    const el = $('modal-map');
+    if (modalLeaflet) { modalLeaflet.remove(); modalLeaflet = null; }
+    modalLeaflet = L.map(el, { zoomControl: true, attributionControl: false });
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(modalLeaflet);
+    modalLeaflet.setView([53.5511, 9.9937], 12);
+    geocodeAndDraw(null, address, true, modalLeaflet);
+  }, 150);
+  $('btn-confirm-delivery').onclick = () => confirmDelivery();
+}
+
+window.closeModal = () => {
+  hide('map-modal');
+  if (modalLeaflet) { modalLeaflet.remove(); modalLeaflet = null; }
+};
+
+async function confirmDelivery() {
+  try {
+    await db.collection('artifacts').doc(APP).collection('public_orders').doc(modalOrderId).update({
+      status: 'geliefert',
+      deliveredAt: new Date().toISOString()
+    });
+    if (modalUserId) {
+      db.collection('artifacts').doc(APP).collection('users').doc(modalUserId)
+        .collection('orders').doc(modalOrderId)
+        .update({ status: 'geliefert' }).catch(()=>{});
+    }
+    closeModal();
+    toast(`🎉 Geliefert! +${fmt(modalEarn)} auf dein Konto`, 'success');
+  } catch(e) { toast('Fehler: ' + e.message, 'error'); }
+}
+
+// ─── WALLET ──────────────────────────────────────────────
+function renderWallet(done) {
+  const total = done.reduce((s,o) => s + o.totalPrice*CUT, 0);
+  $('wallet-total').textContent = fmt(total);
+  $('driver-balance-badge').textContent = fmt(total);
+
+  const el = $('wallet-list');
+  if (!done.length) {
+    el.innerHTML = '<div class="empty" style="padding:.5rem 0;"><div class="ei" style="font-size:1.8rem;">🏁</div><p>Noch keine Lieferungen</p></div>';
+    return;
+  }
+  el.innerHTML = done.map(o => `
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:.6rem 0;border-bottom:1px solid var(--border);">
+      <div>
+        <div style="font-size:.85rem;font-weight:600;">${o.cafe||'Lieferung'}</div>
+        <div style="font-size:.73rem;color:var(--muted);">${fmtDate(o.deliveredAt||o.createdAt)}</div>
+      </div>
+      <div style="font-weight:700;color:var(--primary);">+${fmt(o.totalPrice*CUT)}</div>
+    </div>`).join('');
+}
+
+// ─── GEOCODE + MAP ────────────────────────────────────────
+const geocodeCache = {};
+async function geocodeAndDraw(containerId, address, isModal, existingMap) {
+  let coords = geocodeCache[address];
+  if (!coords) {
+    try {
+      const r = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(address)}&limit=1&accept-language=de&countrycodes=de`);
+      const d = await r.json();
+      if (d && d[0]) coords = { lat: parseFloat(d[0].lat), lng: parseFloat(d[0].lon) };
+    } catch {}
+  }
+  if (coords) geocodeCache[address] = coords;
+
+  const cafeCoord = [53.5511, 9.9937]; // Hamburg default
+  const custCoord = coords ? [coords.lat, coords.lng] : null;
+
+  const draw = (m) => {
+    L.circleMarker(cafeCoord, { radius:8, fillColor:'var(--primary)', color:'#fff', weight:2, fillOpacity:1 }).addTo(m).bindPopup('🏪 Café');
+    if (custCoord) {
+      L.circleMarker(custCoord, { radius:8, fillColor:'var(--danger)', color:'#fff', weight:2, fillOpacity:1 }).addTo(m).bindPopup('🏠 Kunde');
+      L.polyline([cafeCoord, custCoord], { color:'#111614', weight:2.5, dashArray:'7,6', opacity:.75 }).addTo(m);
+      m.fitBounds(L.latLngBounds([cafeCoord, custCoord]), { padding:[25,25] });
+    } else {
+      m.setView(cafeCoord, 13);
+    }
+  };
+
+  if (existingMap) {
+    draw(existingMap);
+    return;
+  }
+
+  const el = document.getElementById(containerId);
+  if (!el || el._li) return;
+  el._li = true;
+  const m = L.map(el, { zoomControl:false, attributionControl:false, dragging:false, scrollWheelZoom:false, doubleClickZoom:false });
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(m);
+  m.setView(cafeCoord, 12);
+  draw(m);
+}
+
+// ═══════════════════════════════════════════════════════════
+// ─── RESTAURANT ──────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════
+let menuUnsub = null;
+let currentCafe = 'junge';
+
+function startRestaurant() {
+  cleanup();
+  const name = currentUser.displayName || currentUser.email;
+  $('rest-name-bar').textContent = name;
+  loadRestOrders();
+  loadMenu('junge');
+
+  $('sel-cafe').addEventListener('change', e => {
+    currentCafe = e.target.value;
+    if (menuUnsub) { menuUnsub(); menuUnsub = null; }
+    loadMenu(currentCafe);
+  });
+
+  $('btn-add-item').addEventListener('click', addMenuItem);
+}
+
+function loadRestOrders() {
+  const u = db.collection('artifacts').doc(APP).collection('public_orders')
+    .onSnapshot(snap => {
+      const all = [];
+      snap.forEach(d => all.push({ id: d.id, ...d.data() }));
+      all.sort((a,b) => new Date(b.createdAt||0) - new Date(a.createdAt||0));
+      renderRestOrders(all);
+      // Stats
+      const active    = all.filter(o => o.status !== 'geliefert').length;
+      const delivered = all.filter(o => o.status === 'geliefert').length;
+      const revenue   = all.filter(o => o.status === 'geliefert').reduce((s,o) => s+(o.totalPrice||0), 0);
+      $('s-total').textContent = all.length;
+      $('s-revenue').textContent = fmt(revenue);
+      $('s-active').textContent = active;
+      $('s-done').textContent = delivered;
+      $('rest-new-badge').textContent = active;
+      $('rest-new-badge').style.display = active > 0 ? '' : 'none';
+      renderStatList(all.slice(0,12));
+    }, e => toast('Fehler: ' + e.message, 'error'));
+  unsubs.push(u);
+}
+
+function renderRestOrders(orders) {
+  const el = $('rest-orders-list');
+  if (!orders.length) {
+    el.innerHTML = '<div class="empty"><div class="ei">📭</div><p>Noch keine Bestellungen</p></div>';
+    return;
+  }
+  const statusMap = {
+    aktiv:     ['red',   '🔴 Neu'],
+    unterwegs: ['orange','🛵 Unterwegs'],
+    geliefert: ['green', '✓ Geliefert']
+  };
+  el.innerHTML = orders.map(o => {
+    const [sc, sl] = statusMap[o.status||'aktiv'] || ['gray','–'];
+    const items = Object.entries(o.items||{}).map(([n,i]) => `<div style="margin-bottom:.15rem;">• ${i.quantity}x ${n}</div>`).join('');
+    const isNew = o.status === 'aktiv';
+    return `<div class="card" style="${isNew ? 'border-left:4px solid var(--danger);' : ''}">
+      <div class="card-header" style="${isNew ? 'background:var(--danger-light);' : ''}">
+        <div>
+          <div style="font-size:.7rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;margin-bottom:.15rem;">${o.cafe||'–'}</div>
+          <div style="font-weight:700;">${fmt(o.totalPrice)}</div>
+          <div style="font-size:.73rem;color:var(--muted);margin-top:.1rem;">${fmtDate(o.createdAt)}</div>
+        </div>
+        <div class="chip ${sc}">${isNew?`<span class="dot pulse" style="background:var(--danger)"></span>`:''}${sl}</div>
+      </div>
+      <div class="card-body" style="font-size:.83rem;padding:.75rem 1.1rem;">${items}</div>
+      <div style="padding:.5rem 1.1rem .85rem;font-size:.77rem;color:var(--muted);">
+        📍 ${o.address||'–'}${o.notes?` · 📝 ${o.notes}`:''}${o.driverName?`<br>🛵 ${o.driverName}`:''}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function renderStatList(orders) {
+  $('stat-list').innerHTML = orders.length ? orders.map(o => `
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:.55rem 0;border-bottom:1px solid var(--border);">
+      <div>
+        <div style="font-size:.84rem;font-weight:600;">${o.cafe||'–'} · ${fmt(o.totalPrice)}</div>
+        <div style="font-size:.72rem;color:var(--muted);">${fmtDate(o.createdAt)}</div>
+      </div>
+      <div class="chip ${o.status==='geliefert'?'green':o.status==='unterwegs'?'orange':'red'}" style="font-size:.7rem;">${o.status==='geliefert'?'✓':o.status==='unterwegs'?'🛵':'Neu'}</div>
+    </div>`).join('') : '<p style="color:var(--muted);font-size:.84rem;">Keine Daten</p>';
+}
+
+// ─── MENU ────────────────────────────────────────────────
+const DEFAULT_MENU = {
+  junge:[
+    {name:'Espresso',price:1.90,emoji:'☕',cat:'Kaffee',desc:'Klein & kräftig'},
+    {name:'Cappuccino',price:2.90,emoji:'🥛',cat:'Kaffee',desc:'Cremiger Milchschaum'},
+    {name:'Latte Macchiato',price:3.50,emoji:'🥛',cat:'Kaffee',desc:'Mild & vollmundig'},
+    {name:'Franzbrötchen',price:1.20,emoji:'🥐',cat:'Backwaren',desc:'Hamburger Original'},
+    {name:'Croissant',price:1.60,emoji:'🥐',cat:'Backwaren',desc:'Buttrig & knusprig'},
+    {name:'Käsebrötchen',price:2.60,emoji:'🧀',cat:'Snacks',desc:'Gouda überbacken'},
+  ],
+  double:[
+    {name:'Espresso',price:2.50,emoji:'☕',cat:'Kaffee',desc:'Specialty Arabica'},
+    {name:'Flat White',price:3.50,emoji:'🤎',cat:'Kaffee',desc:'Stark & seidig'},
+    {name:'Cold Brew',price:4.20,emoji:'🧊',cat:'Kaffee',desc:'12h kalt gebrüht'},
+    {name:'Croissant',price:2.20,emoji:'🥐',cat:'Kuchen',desc:'Hausgemacht'},
+    {name:'Brownie',price:3.20,emoji:'🍫',cat:'Kuchen',desc:'Saftig & schokoladig'},
+  ]
+};
+
+function loadMenu(cafeId) {
+  const ref = db.collection('artifacts').doc(APP).collection('restaurant_menus').doc(cafeId).collection('items');
+  menuUnsub = ref.onSnapshot(async snap => {
+    if (snap.empty) {
+      for (const item of (DEFAULT_MENU[cafeId]||[])) await ref.add(item).catch(()=>{});
+      return;
+    }
+    const items = [];
+    snap.forEach(d => items.push({ id: d.id, ...d.data() }));
+    items.sort((a,b) => (a.cat||'').localeCompare(b.cat||'') || (a.name||'').localeCompare(b.name||''));
+    $('menu-count').textContent = items.length;
+    renderMenu(items, cafeId);
+  }, e => toast('Fehler Sortiment: ' + e.message, 'error'));
+  unsubs.push(() => { if(menuUnsub) menuUnsub(); });
+}
+
+function renderMenu(items, cafeId) {
+  const el = $('menu-list');
+  if (!items.length) { el.innerHTML = '<p style="color:var(--muted);font-size:.84rem;">Keine Artikel</p>'; return; }
+  let lastCat = null;
+  el.innerHTML = items.map(item => {
+    let hdr = '';
+    if (item.cat !== lastCat) {
+      lastCat = item.cat;
+      hdr = `<div class="section-label" style="margin-top:.9rem;">${item.cat||'Sonstiges'}</div>`;
+    }
+    return hdr + `<div class="menu-row">
+      <div class="em">${item.emoji||'☕'}</div>
+      <div class="info">
+        <div class="nm">${item.name}</div>
+        <div class="ct">${item.desc||''}</div>
+      </div>
+      <div class="pr">${fmt(item.price)}</div>
+      <button class="del-btn" data-del="${item.id}" data-cafe="${cafeId}">✕</button>
+    </div>`;
+  }).join('');
+
+  el.querySelectorAll('[data-del]').forEach(btn => {
+    btn.addEventListener('click', () => delItem(btn.dataset.cafe, btn.dataset.del));
+  });
+}
+
+async function delItem(cafeId, itemId) {
+  if (!confirm('Artikel löschen?')) return;
+  await db.collection('artifacts').doc(APP).collection('restaurant_menus').doc(cafeId).collection('items').doc(itemId).delete().catch(e => toast(e.message, 'error'));
+  toast('Gelöscht');
+}
+
+async function addMenuItem() {
+  const name  = $('new-name').value.trim();
+  const emoji = $('new-emoji').value.trim() || '☕';
+  const price = parseFloat($('new-price').value);
+  const cat   = $('new-cat').value.trim() || 'Sonstiges';
+  const desc  = $('new-desc').value.trim();
+  if (!name || isNaN(price) || price < 0) return toast('Name und Preis sind Pflicht!', 'error');
+  const cafeId = $('sel-cafe').value;
+  const btn = $('btn-add-item');
+  btn.disabled = true; btn.textContent = '...';
+  try {
+    await db.collection('artifacts').doc(APP).collection('restaurant_menus').doc(cafeId).collection('items').add({ name, emoji, price, cat, desc, createdAt: new Date().toISOString() });
+    ['new-name','new-emoji','new-price','new-cat','new-desc'].forEach(id => $(id).value='');
+    toast('✅ Artikel hinzugefügt!', 'success');
+  } catch(e) { toast('Fehler: '+e.message,'error'); }
+  btn.disabled = false; btn.textContent = 'Hinzufügen';
+}
+</script>
+
+</body>
+</html>
