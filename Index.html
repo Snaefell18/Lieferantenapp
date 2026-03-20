@@ -1,1 +1,1011 @@
+<!DOCTYPE html>
+
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CoffeeDrop · Crew</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<style>
+:root {
+  --ink: #0f0f0f;
+  --paper: #fafaf7;
+  --cream: #f2f0e8;
+  --rust: #c8441a;
+  --rust-light: #fdf0eb;
+  --green: #1a7a4a;
+  --green-light: #ebf7f1;
+  --gold: #c9a227;
+  --gold-light: #fdf8eb;
+  --border: #e5e2d8;
+  --muted: #8a8680;
+  --card: #ffffff;
+  --shadow: 0 2px 16px rgba(15,15,15,0.07);
+  --shadow-lg: 0 8px 40px rgba(15,15,15,0.12);
+}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
+body{font-family:'DM Sans',sans-serif;background:var(--paper);color:var(--ink);min-height:100vh;overflow-x:hidden;}
+h1,h2,h3,.serif{font-family:'DM Serif Display',serif;}
+.hide{display:none!important;}
+::-webkit-scrollbar{display:none;}
+
+/* ── LOADER ── */
+#loader{position:fixed;inset:0;background:var(–ink);display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:999;transition:opacity .5s;}
+#loader .logo-text{font-family:‘DM Serif Display’,serif;color:#fff;font-size:2.8rem;letter-spacing:-.02em;margin-bottom:.5rem;}
+#loader .logo-sub{color:rgba(255,255,255,.4);font-size:.85rem;letter-spacing:.15em;text-transform:uppercase;}
+#loader .bar{width:80px;height:2px;background:rgba(255,255,255,.15);border-radius:2px;overflow:hidden;margin-top:2rem;}
+#loader .bar-fill{height:100%;background:#fff;animation:barLoad 2s ease forwards;}
+@keyframes barLoad{0%{width:0}100%{width:100%}}
+
+/* ── AUTH ── */
+#auth-screen{min-height:100vh;display:flex;align-items:center;justify-content:center;background:var(–ink);padding:2rem;}
+.auth-card{background:#fff;border-radius:24px;padding:2.5rem 2rem;width:100%;max-width:380px;text-align:center;}
+.auth-card .brand{font-family:‘DM Serif Display’,serif;font-size:2rem;margin-bottom:.25rem;}
+.auth-card .brand span{color:var(–rust);}
+.auth-card p{color:var(–muted);font-size:.9rem;margin-bottom:2rem;}
+.auth-divider{display:flex;align-items:center;gap:1rem;margin:1.5rem 0;color:var(–muted);font-size:.8rem;}
+.auth-divider::before,.auth-divider::after{content:’’;flex:1;height:1px;background:var(–border);}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:.6rem;padding:.85rem 1.5rem;border-radius:14px;font-family:‘DM Sans’,sans-serif;font-weight:600;font-size:.95rem;border:none;cursor:pointer;transition:all .2s;width:100%;}
+.btn:active{transform:scale(.97);}
+.btn-dark{background:var(–ink);color:#fff;}
+.btn-dark:hover{background:#222;}
+.btn-outline{background:#fff;color:var(–ink);border:2px solid var(–border);}
+.btn-outline:hover{border-color:#aaa;background:var(–cream);}
+.btn-rust{background:var(–rust);color:#fff;}
+.btn-rust:hover{background:#b33a15;}
+.btn-green{background:var(–green);color:#fff;}
+.btn-green:hover{background:#155e38;}
+.btn-gold{background:var(–gold);color:#fff;}
+.btn-sm{padding:.6rem 1.1rem;font-size:.82rem;border-radius:10px;width:auto;}
+.input{width:100%;padding:.9rem 1.1rem;border:2px solid var(–border);border-radius:14px;font-family:‘DM Sans’,sans-serif;font-size:.95rem;background:var(–cream);outline:none;transition:border .2s;}
+.input:focus{border-color:var(–ink);}
+
+/* ── ROLE SELECT ── */
+#role-screen{min-height:100vh;background:var(–paper);display:flex;flex-direction:column;}
+.role-header{background:var(–ink);color:#fff;padding:1.5rem;display:flex;align-items:center;justify-content:space-between;}
+.role-header .brand{font-family:‘DM Serif Display’,serif;font-size:1.4rem;}
+.role-header .brand span{color:var(–rust);}
+.role-header .user-pill{background:rgba(255,255,255,.1);border-radius:999px;padding:.4rem 1rem;font-size:.82rem;color:rgba(255,255,255,.8);}
+.role-body{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:2rem;gap:1.2rem;}
+.role-body h2{font-family:‘DM Serif Display’,serif;font-size:1.8rem;text-align:center;margin-bottom:.5rem;}
+.role-body p{color:var(–muted);text-align:center;font-size:.9rem;margin-bottom:1rem;}
+.role-card{width:100%;max-width:340px;background:var(–card);border-radius:22px;padding:2rem 1.5rem;border:2px solid var(–border);cursor:pointer;transition:all .25s;box-shadow:var(–shadow);}
+.role-card:hover{border-color:var(–ink);transform:translateY(-2px);box-shadow:var(–shadow-lg);}
+.role-card:active{transform:scale(.98);}
+.role-card .icon{font-size:2.8rem;margin-bottom:1rem;}
+.role-card h3{font-family:‘DM Serif Display’,serif;font-size:1.3rem;margin-bottom:.4rem;}
+.role-card p{color:var(–muted);font-size:.85rem;margin:0;}
+
+/* ── SHARED APP SHELL ── */
+.app-shell{min-height:100vh;display:flex;flex-direction:column;}
+.app-header{background:var(–ink);color:#fff;padding:1rem 1.2rem;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100;}
+.app-header .left{display:flex;align-items:center;gap:.8rem;}
+.app-header .back-btn{width:36px;height:36px;border-radius:10px;background:rgba(255,255,255,.1);border:none;color:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:1.1rem;transition:background .2s;}
+.app-header .back-btn:hover{background:rgba(255,255,255,.2);}
+.app-header h1{font-family:‘DM Serif Display’,serif;font-size:1.25rem;}
+.app-header .right{display:flex;gap:.5rem;align-items:center;}
+.pill-badge{background:var(–rust);color:#fff;font-size:.72rem;font-weight:700;padding:.25rem .7rem;border-radius:999px;}
+.pill-badge.green{background:var(–green);}
+.pill-badge.gold{background:var(–gold);}
+.tab-bar{display:flex;background:var(–ink);border-top:1px solid rgba(255,255,255,.08);position:sticky;bottom:0;z-index:100;}
+.tab-btn{flex:1;padding:.9rem .5rem .75rem;display:flex;flex-direction:column;align-items:center;gap:.25rem;color:rgba(255,255,255,.4);background:none;border:none;cursor:pointer;font-family:‘DM Sans’,sans-serif;font-size:.7rem;font-weight:600;letter-spacing:.04em;text-transform:uppercase;transition:color .2s;}
+.tab-btn.active{color:#fff;}
+.tab-btn svg{width:22px;height:22px;}
+.tab-content{display:none;flex:1;overflow-y:auto;}
+.tab-content.active{display:block;}
+.section-pad{padding:1.2rem;}
+.card{background:var(–card);border-radius:18px;border:1.5px solid var(–border);box-shadow:var(–shadow);overflow:hidden;}
+.card+.card{margin-top:.9rem;}
+.card-body{padding:1.1rem 1.2rem;}
+.label{font-size:.72rem;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(–muted);margin-bottom:.25rem;}
+.chip{display:inline-flex;align-items:center;gap:.3rem;padding:.3rem .7rem;border-radius:999px;font-size:.75rem;font-weight:600;}
+.chip.green{background:var(–green-light);color:var(–green);}
+.chip.rust{background:var(–rust-light);color:var(–rust);}
+.chip.gold{background:var(–gold-light);color:var(–gold);}
+.chip.gray{background:var(–cream);color:var(–muted);}
+.dot{width:7px;height:7px;border-radius:50%;display:inline-block;}
+.dot.pulse{animation:dotPulse 1.6s ease-in-out infinite;}
+@keyframes dotPulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.4;transform:scale(1.5)}}
+
+/* ── TOAST ── */
+#toast{position:fixed;top:1.2rem;left:50%;transform:translateX(-50%) translateY(-120%);background:var(–ink);color:#fff;padding:.9rem 1.4rem;border-radius:14px;z-index:9999;font-size:.9rem;font-weight:500;transition:transform .3s cubic-bezier(.2,.8,.2,1);max-width:90vw;text-align:center;box-shadow:var(–shadow-lg);}
+#toast.show{transform:translateX(-50%) translateY(0);}
+
+/* ── DRIVER ── */
+.earnings-banner{background:linear-gradient(135deg,var(–ink) 0%,#2a2a2a 100%);color:#fff;padding:1.5rem;border-radius:20px;margin-bottom:1.2rem;display:flex;align-items:center;justify-content:space-between;}
+.earnings-banner .amount{font-family:‘DM Serif Display’,serif;font-size:2.2rem;}
+.earnings-banner .sub{font-size:.78rem;color:rgba(255,255,255,.5);margin-top:.1rem;}
+.earnings-banner .icon{font-size:2.5rem;opacity:.6;}
+.order-card{background:var(–card);border-radius:18px;border:1.5px solid var(–border);margin-bottom:.9rem;overflow:hidden;box-shadow:var(–shadow);}
+.order-card .header{padding:1rem 1.1rem .7rem;display:flex;justify-content:space-between;align-items:flex-start;border-bottom:1px solid var(–border);}
+.order-card .café-tag{font-size:.75rem;font-weight:700;color:var(–muted);letter-spacing:.06em;text-transform:uppercase;}
+.order-card .items-list{padding:.8rem 1.1rem;font-size:.88rem;color:#444;line-height:1.8;}
+.order-card .footer{padding:.8rem 1.1rem;background:var(–cream);display:flex;justify-content:space-between;align-items:center;gap:.7rem;flex-wrap:wrap;}
+.earning-tag{background:var(–gold-light);border:1.5px solid var(–gold);color:var(–gold);border-radius:10px;padding:.4rem .9rem;font-weight:700;font-size:.9rem;display:flex;align-items:center;gap:.4rem;}
+.map-container{height:200px;border-radius:14px;overflow:hidden;margin:.8rem 1.1rem;border:1.5px solid var(–border);}
+.map-mini{height:100%;background:#e8e4dc;}
+.accept-btn{flex:1;background:var(–ink);color:#fff;border:none;padding:.75rem;border-radius:12px;font-weight:700;font-size:.9rem;cursor:pointer;font-family:‘DM Sans’,sans-serif;transition:background .2s;min-width:120px;}
+.accept-btn:hover{background:#333;}
+.accept-btn:active{transform:scale(.97);}
+.accept-btn:disabled{background:#ccc;cursor:not-allowed;}
+
+/* ── RESTAURANT ── */
+.stat-row{display:grid;grid-template-columns:1fr 1fr;gap:.8rem;margin-bottom:1.2rem;}
+.stat-box{background:var(–card);border:1.5px solid var(–border);border-radius:16px;padding:1.1rem;box-shadow:var(–shadow);}
+.stat-box .val{font-family:‘DM Serif Display’,serif;font-size:1.8rem;margin-bottom:.1rem;}
+.stat-box .lbl{font-size:.73rem;color:var(–muted);font-weight:600;text-transform:uppercase;letter-spacing:.06em;}
+.menu-item-row{display:flex;align-items:center;gap:.8rem;padding:.9rem 0;border-bottom:1px solid var(–border);}
+.menu-item-row:last-child{border-bottom:none;}
+.menu-item-row .emoji{font-size:1.5rem;width:38px;text-align:center;flex-shrink:0;}
+.menu-item-row .info{flex:1;min-width:0;}
+.menu-item-row .info .name{font-weight:600;font-size:.92rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.menu-item-row .info .cat{font-size:.75rem;color:var(–muted);}
+.menu-item-row .price{font-weight:700;font-size:.95rem;white-space:nowrap;margin-right:.5rem;}
+.menu-item-row .del-btn{width:30px;height:30px;border-radius:8px;background:var(–rust-light);color:var(–rust);border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:1rem;transition:background .2s;flex-shrink:0;}
+.menu-item-row .del-btn:hover{background:var(–rust);color:#fff;}
+.add-item-form{background:var(–card);border-radius:18px;border:1.5px solid var(–border);padding:1.2rem;margin-top:1rem;}
+.add-item-form h3{font-family:‘DM Serif Display’,serif;font-size:1.1rem;margin-bottom:1rem;}
+.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:.7rem;margin-bottom:.7rem;}
+.form-grid .full{grid-column:1/-1;}
+.toggle-switch{position:relative;width:44px;height:24px;flex-shrink:0;}
+.toggle-switch input{opacity:0;width:0;height:0;}
+.toggle-slider{position:absolute;inset:0;background:#ccc;border-radius:999px;cursor:pointer;transition:.3s;}
+.toggle-slider::before{content:’’;position:absolute;width:18px;height:18px;left:3px;bottom:3px;background:#fff;border-radius:50%;transition:.3s;}
+input:checked+.toggle-slider{background:var(–green);}
+input:checked+.toggle-slider::before{transform:translateX(20px);}
+
+.order-incoming{border-left:4px solid var(–rust);}
+.order-incoming .header{background:var(–rust-light);}
+
+/* ── EMPTY STATE ── */
+.empty-state{text-align:center;padding:3rem 1.5rem;color:var(–muted);}
+.empty-state .icon{font-size:3rem;margin-bottom:1rem;opacity:.5;}
+.empty-state p{font-size:.9rem;}
+
+/* ── MODAL ── */
+.modal-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:500;display:flex;align-items:flex-end;justify-content:center;}
+.modal{background:#fff;border-radius:24px 24px 0 0;padding:1.5rem;width:100%;max-width:480px;max-height:90vh;overflow-y:auto;}
+.modal h2{font-family:‘DM Serif Display’,serif;font-size:1.4rem;margin-bottom:1rem;}
+#map-modal{height:260px;border-radius:14px;overflow:hidden;margin:1rem 0;border:1.5px solid var(–border);}
+
+/* Leaflet z-index */
+.leaflet-container{z-index:1!important;}
+</style>
+
+</head>
+<body>
+
+<!-- LOADER -->
+
+<div id="loader">
+  <div class="logo-text">Coffee<span style="color:var(--rust)">Drop</span></div>
+  <div class="logo-sub">Crew · Partner · Lieferung</div>
+  <div class="bar"><div class="bar-fill"></div></div>
+</div>
+
+<!-- TOAST -->
+
+<div id="toast"></div>
+
+<!-- ═══════════════════════════════ LOGIN ═══════════════════════════════ -->
+
+<div id="auth-screen" class="hide">
+  <div class="auth-card">
+    <div class="brand">Coffee<span>Drop</span></div>
+    <p>Crew-Portal · Nur für Partner</p>
+    <button class="btn btn-dark" id="google-btn">
+      <svg width="18" height="18" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>
+      Mit Google anmelden
+    </button>
+    <div class="auth-divider">oder</div>
+    <div style="display:flex;flex-direction:column;gap:.7rem;">
+      <input class="input" type="email" id="email-in" placeholder="E-Mail">
+      <input class="input" type="password" id="pw-in" placeholder="Passwort">
+      <button class="btn btn-outline" id="email-btn">Einloggen / Registrieren</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════ ROLE SELECT ════════════════════════════ -->
+
+<div id="role-screen" class="hide">
+  <div class="role-header">
+    <div class="brand">Coffee<span>Drop</span> <span style="font-size:.85rem;font-family:'DM Sans',sans-serif;color:rgba(255,255,255,.5);font-weight:400;">Crew</span></div>
+    <div style="display:flex;align-items:center;gap:.6rem;">
+      <div class="user-pill" id="role-user-name"></div>
+      <button class="btn btn-outline btn-sm" id="role-logout-btn" style="width:auto;color:#fff;border-color:rgba(255,255,255,.2);background:rgba(255,255,255,.08);">Logout</button>
+    </div>
+  </div>
+  <div class="role-body">
+    <h2>Wer bist du heute?</h2>
+    <p>Wähle deine Rolle für diese Session</p>
+    <div class="role-card" id="role-driver-btn">
+      <div class="icon">🛵</div>
+      <h3>Ich bin Lieferant</h3>
+      <p>Bestellungen annehmen, ausliefern und Geld verdienen</p>
+    </div>
+    <div class="role-card" id="role-restaurant-btn">
+      <div class="icon">🏪</div>
+      <h3>Ich bin Restaurant</h3>
+      <p>Sortiment verwalten, eingehende Bestellungen sehen</p>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════ DRIVER APP ════════════════════════════ -->
+
+<div id="driver-app" class="app-shell hide">
+  <div class="app-header">
+    <div class="left">
+      <button class="back-btn" id="driver-back">←</button>
+      <h1>Lieferant</h1>
+    </div>
+    <div class="right">
+      <span class="pill-badge gold" id="driver-balance-badge">0,00 €</span>
+      <button class="btn btn-outline btn-sm" id="driver-logout" style="width:auto;color:#fff;border-color:rgba(255,255,255,.25);background:rgba(255,255,255,.08);">Logout</button>
+    </div>
+  </div>
+
+  <!-- TAB BAR -->
+
+  <div style="display:flex;flex-direction:column;flex:1;overflow:hidden;">
+    <div class="tab-bar" style="position:sticky;top:64px;order:-1;">
+      <button class="tab-btn active" data-tab="driver-open">
+        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
+        Offen
+      </button>
+      <button class="tab-btn" data-tab="driver-mine">
+        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+        Meine
+      </button>
+      <button class="tab-btn" data-tab="driver-earnings">
+        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+        Verdienst
+      </button>
+    </div>
+
+```
+<!-- TAB: Offene Bestellungen -->
+<div class="tab-content active section-pad" id="tab-driver-open">
+  <div id="open-orders-list">
+    <div class="empty-state"><div class="icon">📭</div><p>Keine offenen Bestellungen gerade</p></div>
+  </div>
+</div>
+
+<!-- TAB: Meine angenommenen -->
+<div class="tab-content section-pad" id="tab-driver-mine">
+  <div id="my-orders-list">
+    <div class="empty-state"><div class="icon">🛵</div><p>Du hast noch keine Bestellungen angenommen</p></div>
+  </div>
+</div>
+
+<!-- TAB: Verdienst -->
+<div class="tab-content section-pad" id="tab-driver-earnings">
+  <div class="earnings-banner">
+    <div>
+      <div class="label" style="color:rgba(255,255,255,.4);margin-bottom:.3rem;">Guthaben gesamt</div>
+      <div class="amount" id="total-earnings">0,00 €</div>
+      <div class="sub">40 % jeder Bestellung</div>
+    </div>
+    <div class="icon">💰</div>
+  </div>
+  <div class="card">
+    <div class="card-body">
+      <div class="label" style="margin-bottom:.8rem;">Abgeschlossene Lieferungen</div>
+      <div id="earnings-list">
+        <div class="empty-state" style="padding:1.5rem 0;"><div class="icon" style="font-size:2rem;">🏁</div><p>Noch keine abgeschlossenen Lieferungen</p></div>
+      </div>
+    </div>
+  </div>
+</div>
+```
+
+  </div>
+</div>
+
+<!-- ═══════════════════════════ RESTAURANT APP ════════════════════════ -->
+
+<div id="restaurant-app" class="app-shell hide">
+  <div class="app-header">
+    <div class="left">
+      <button class="back-btn" id="rest-back">←</button>
+      <div>
+        <h1 id="rest-cafe-title">Restaurant</h1>
+      </div>
+    </div>
+    <div class="right">
+      <span class="pill-badge" id="rest-orders-badge" style="display:none;">0</span>
+      <button class="btn btn-outline btn-sm" id="rest-logout" style="width:auto;color:#fff;border-color:rgba(255,255,255,.25);background:rgba(255,255,255,.08);">Logout</button>
+    </div>
+  </div>
+
+  <div style="display:flex;flex-direction:column;flex:1;overflow:hidden;">
+    <div class="tab-bar" style="position:sticky;top:64px;order:-1;">
+      <button class="tab-btn active" data-tab="rest-orders">
+        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
+        Bestellungen
+      </button>
+      <button class="tab-btn" data-tab="rest-menu">
+        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 10h16M4 14h16M4 18h16"/></svg>
+        Sortiment
+      </button>
+      <button class="tab-btn" data-tab="rest-stats">
+        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
+        Statistik
+      </button>
+    </div>
+
+```
+<!-- TAB: Eingehende Bestellungen -->
+<div class="tab-content active section-pad" id="tab-rest-orders">
+  <div id="rest-orders-list">
+    <div class="empty-state"><div class="icon">📭</div><p>Keine aktuellen Bestellungen</p></div>
+  </div>
+</div>
+
+<!-- TAB: Sortiment -->
+<div class="tab-content section-pad" id="tab-rest-menu">
+  <div class="card" style="margin-bottom:1rem;">
+    <div class="card-body">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.8rem;">
+        <div class="label">Café auswählen</div>
+      </div>
+      <select class="input" id="rest-cafe-select" style="padding:.7rem .9rem;">
+        <option value="junge">Stadtbäckerei Junge</option>
+        <option value="double">Double Coffee</option>
+      </select>
+    </div>
+  </div>
+
+  <div class="card" id="menu-items-card">
+    <div class="card-body">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;">
+        <div class="label">Aktuelle Artikel (<span id="menu-count">0</span>)</div>
+      </div>
+      <div id="menu-items-list"><p style="color:var(--muted);font-size:.85rem;">Lade Sortiment...</p></div>
+    </div>
+  </div>
+
+  <div class="add-item-form">
+    <h3>Artikel hinzufügen</h3>
+    <div class="form-grid">
+      <input class="input full" type="text" id="new-name" placeholder="Name (z.B. Oat Latte)">
+      <input class="input" type="text" id="new-emoji" placeholder="Emoji 🍵">
+      <input class="input" type="number" id="new-price" placeholder="Preis (€)" step="0.10" min="0">
+      <input class="input" type="text" id="new-cat" placeholder="Kategorie">
+      <input class="input full" type="text" id="new-desc" placeholder="Kurzbeschreibung">
+    </div>
+    <button class="btn btn-dark" id="add-item-btn">+ Artikel hinzufügen</button>
+  </div>
+</div>
+
+<!-- TAB: Statistik -->
+<div class="tab-content section-pad" id="tab-rest-stats">
+  <div class="stat-row">
+    <div class="stat-box"><div class="val" id="stat-total-orders">0</div><div class="lbl">Bestellungen</div></div>
+    <div class="stat-box"><div class="val" id="stat-revenue">0 €</div><div class="lbl">Umsatz</div></div>
+  </div>
+  <div class="stat-row">
+    <div class="stat-box"><div class="val" id="stat-active">0</div><div class="lbl">Aktiv</div></div>
+    <div class="stat-box"><div class="val" id="stat-delivered">0</div><div class="lbl">Geliefert</div></div>
+  </div>
+  <div class="card">
+    <div class="card-body">
+      <div class="label" style="margin-bottom:.8rem;">Letzte Bestellungen</div>
+      <div id="stat-orders-list"><p style="color:var(--muted);font-size:.85rem;">Keine Daten</p></div>
+    </div>
+  </div>
+</div>
+```
+
+  </div>
+</div>
+
+<!-- MAP MODAL (Route Linie) -->
+
+<div id="map-modal-backdrop" class="modal-backdrop hide" onclick="closeMapModal()">
+  <div class="modal" onclick="event.stopPropagation()">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.5rem;">
+      <h2>Route zum Kunden</h2>
+      <button onclick="closeMapModal()" style="background:none;border:none;font-size:1.4rem;cursor:pointer;color:var(--muted);">✕</button>
+    </div>
+    <div id="map-modal" style="height:280px;border-radius:14px;overflow:hidden;border:1.5px solid var(--border);"></div>
+    <div id="modal-address" style="font-size:.85rem;color:var(--muted);margin-top:.5rem;padding:.7rem;background:var(--cream);border-radius:10px;"></div>
+    <div style="margin-top:.8rem;display:flex;gap:.7rem;">
+      <button class="btn btn-dark" id="modal-confirm-btn" style="flex:1;">✓ Lieferung bestätigen</button>
+      <button class="btn btn-outline btn-sm" onclick="closeMapModal()" style="flex:.4;">Schließen</button>
+    </div>
+  </div>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
+import {
+  getAuth, onAuthStateChanged, signOut, signInWithPopup, GoogleAuthProvider,
+  signInWithEmailAndPassword, createUserWithEmailAndPassword
+} from "https://www.gstatic.com/firebasejs/10.8.1/firebase-auth.js";
+import {
+  getFirestore, collection, collectionGroup, onSnapshot, doc, updateDoc,
+  addDoc, deleteDoc, getDocs, query, where, orderBy, setDoc, getDoc
+} from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
+
+// ─── CONFIG ──────────────────────────────────────────────────────────────────
+const firebaseConfig = {
+  apiKey: "AIzaSyBddDHPUptynMcVWvDKGVQOnTNwitujCEg",
+  authDomain: "kaffee-544f4.firebaseapp.com",
+  projectId: "kaffee-544f4",
+  storageBucket: "kaffee-544f4.firebasestorage.app",
+  messagingSenderId: "1082256261108",
+  appId: "1:1082256261108:web:374edc340875e48ecb83a1"
+};
+
+const fbApp   = initializeApp(firebaseConfig);
+const auth    = getAuth(fbApp);
+const db      = getFirestore(fbApp);
+const gProv   = new GoogleAuthProvider();
+const APP_ID  = 'coffee-drop-app';
+const DRIVER_CUT = 0.40; // 40% für den Fahrer
+
+// ─── STATE ───────────────────────────────────────────────────────────────────
+let currentUser = null;
+let currentRole = null;
+let unsubs = [];
+let modalMap = null, modalOrderId = null, modalUserId = null;
+let driverBalance = 0;
+let restCafe = 'junge';
+
+// ─── DOM HELPERS ─────────────────────────────────────────────────────────────
+const $ = id => document.getElementById(id);
+const show = id => $(id).classList.remove('hide');
+const hide = id => $(id).classList.add('hide');
+
+let toastTimer;
+function toast(msg, dur=3500) {
+  const el = $('toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.remove('show'), dur);
+}
+
+function fmt(n) { return n.toFixed(2).replace('.', ',') + ' €'; }
+function fmtDate(iso) {
+  if (!iso) return '–';
+  const d = new Date(iso);
+  return d.toLocaleDateString('de-DE') + ' · ' + d.toLocaleTimeString('de-DE', {hour:'2-digit',minute:'2-digit'});
+}
+
+// ─── SCREENS ─────────────────────────────────────────────────────────────────
+function showScreen(id) {
+  ['loader','auth-screen','role-screen','driver-app','restaurant-app'].forEach(hide);
+  show(id);
+}
+
+// ─── TAB SYSTEM ──────────────────────────────────────────────────────────────
+document.querySelectorAll('.tab-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const tab = btn.dataset.tab;
+    const shell = btn.closest('.app-shell');
+    shell.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    shell.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+    btn.classList.add('active');
+    const content = $('tab-' + tab);
+    if (content) content.classList.add('active');
+  });
+});
+
+// ─── AUTH ─────────────────────────────────────────────────────────────────────
+$('google-btn').addEventListener('click', async () => {
+  try { await signInWithPopup(auth, gProv); }
+  catch(e) { toast('Google-Login fehlgeschlagen: ' + e.message); }
+});
+
+$('email-btn').addEventListener('click', async () => {
+  const email = $('email-in').value, pw = $('pw-in').value;
+  if (!email || !pw) return toast('E-Mail und Passwort eingeben!');
+  try { await signInWithEmailAndPassword(auth, email, pw); }
+  catch {
+    try { await createUserWithEmailAndPassword(auth, email, pw); toast('Account erstellt!'); }
+    catch(e) { toast('Fehler: ' + e.message); }
+  }
+});
+
+function doLogout() { unsubs.forEach(u => u()); unsubs = []; signOut(auth); }
+$('driver-logout').addEventListener('click', doLogout);
+$('rest-logout').addEventListener('click', doLogout);
+$('role-logout-btn').addEventListener('click', doLogout);
+$('driver-back').addEventListener('click', () => { unsubs.forEach(u=>u()); unsubs=[]; currentRole=null; showScreen('role-screen'); });
+$('rest-back').addEventListener('click', () => { unsubs.forEach(u=>u()); unsubs=[]; currentRole=null; showScreen('role-screen'); });
+
+onAuthStateChanged(auth, user => {
+  hide('loader');
+  if (user) {
+    currentUser = user;
+    $('role-user-name').textContent = user.displayName || user.email || 'Angemeldet';
+    showScreen('role-screen');
+  } else {
+    currentUser = null;
+    showScreen('auth-screen');
+  }
+});
+
+// ─── ROLE SELECT ──────────────────────────────────────────────────────────────
+$('role-driver-btn').addEventListener('click', () => { currentRole = 'driver'; startDriver(); showScreen('driver-app'); });
+$('role-restaurant-btn').addEventListener('click', () => { currentRole = 'restaurant'; startRestaurant(); showScreen('restaurant-app'); });
+
+// ══════════════════════════════════════════════════════════════════════════════
+// ─── DRIVER LOGIC ─────────────────────────────────────────────────────────────
+// ══════════════════════════════════════════════════════════════════════════════
+function startDriver() {
+  driverBalance = 0;
+  loadOpenOrders();
+  loadMyOrders();
+}
+
+// Alle Bestellungen aller User, die 'aktiv' sind und keinen Fahrer haben → offene Bestellungen
+function loadOpenOrders() {
+  // Wir lesen aus dem bekannten Pfad-Schema: artifacts/APP_ID/users/{uid}/orders
+  // Da wir keinen collectionGroup-Index haben wollen, nutzen wir einen Public-Mirror:
+  // Jede Bestellung wird beim Abschicken (in der Kunden-App) AUCH in
+  // artifacts/APP_ID/public_orders/{orderId} gespiegelt.
+  // Für bestehende Bestellungen lesen wir die public_orders Collection.
+  const ref = collection(db, 'artifacts', APP_ID, 'public_orders');
+  const u = onSnapshot(ref, snap => {
+    const orders = [];
+    snap.forEach(d => {
+      const data = d.data();
+      if (data.status === 'aktiv' && !data.driverId) {
+        orders.push({ id: d.id, ...data });
+      }
+    });
+    orders.sort((a,b) => new Date(b.createdAt) - new Date(a.createdAt));
+    renderOpenOrders(orders);
+  });
+  unsubs.push(u);
+}
+
+function loadMyOrders() {
+  const ref = collection(db, 'artifacts', APP_ID, 'public_orders');
+  const u = onSnapshot(ref, snap => {
+    const mine = [], done = [];
+    snap.forEach(d => {
+      const data = d.data();
+      if (data.driverId === currentUser.uid) {
+        (data.status === 'geliefert' ? done : mine).push({ id: d.id, ...data });
+      }
+    });
+    mine.sort((a,b) => new Date(b.createdAt) - new Date(a.createdAt));
+    done.sort((a,b) => new Date(b.createdAt) - new Date(a.createdAt));
+    renderMyOrders(mine);
+    renderEarnings(done);
+  });
+  unsubs.push(u);
+}
+
+function driverEarning(totalPrice) {
+  return totalPrice * DRIVER_CUT;
+}
+
+function renderOpenOrders(orders) {
+  const el = $('open-orders-list');
+  if (!orders.length) {
+    el.innerHTML = '<div class="empty-state"><div class="icon">📭</div><p>Keine offenen Bestellungen gerade.<br>Schau gleich nochmal vorbei!</p></div>';
+    return;
+  }
+  el.innerHTML = orders.map(o => {
+    const earn = driverEarning(o.totalPrice || 0);
+    const items = Object.entries(o.items || {}).map(([n,i]) => `${i.quantity}x ${n}`).join(', ');
+    return `
+    <div class="order-card" data-id="${o.id}">
+      <div class="header">
+        <div>
+          <div class="café-tag">${o.cafe || 'Café'}</div>
+          <div style="font-weight:700;font-size:1rem;margin-top:.2rem;">${fmt(o.totalPrice||0)}</div>
+          <div style="font-size:.78rem;color:var(--muted);margin-top:.1rem;">${fmtDate(o.createdAt)}</div>
+        </div>
+        <div class="earning-tag">
+          <span>💰</span> ${fmt(earn)}
+          <span style="font-size:.7rem;font-weight:400;opacity:.7;">für dich</span>
+        </div>
+      </div>
+      <div class="items-list">${items || '–'}</div>
+      <div class="map-container"><div id="minimap-open-${o.id}" class="map-mini"></div></div>
+      <div class="footer">
+        <div style="font-size:.8rem;color:var(--muted);flex:1;">📍 ${o.address || 'Keine Adresse'}</div>
+        <button class="accept-btn" data-accept="${o.id}" data-uid="${o.userId||''}">Annehmen →</button>
+      </div>
+    </div>`;
+  }).join('');
+
+  // Mini-Maps zeichnen
+  orders.forEach(o => {
+    if (o.address) drawMiniMap('minimap-open-' + o.id, o.address, o.cafeCoords);
+  });
+
+  // Event delegation für Annehmen-Buttons
+  el.querySelectorAll('[data-accept]').forEach(btn => {
+    btn.addEventListener('click', () => acceptOrder(btn.dataset.accept, btn.dataset.uid));
+  });
+}
+
+async function acceptOrder(orderId, userId) {
+  try {
+    const ref = doc(db, 'artifacts', APP_ID, 'public_orders', orderId);
+    await updateDoc(ref, {
+      driverId: currentUser.uid,
+      driverName: currentUser.displayName || currentUser.email,
+      acceptedAt: new Date().toISOString(),
+      status: 'unterwegs'
+    });
+    // Auch im User-Dokument spiegeln falls userId vorhanden
+    if (userId) {
+      try {
+        const userRef = doc(db, 'artifacts', APP_ID, 'users', userId, 'orders', orderId);
+        await updateDoc(userRef, { status: 'unterwegs', driverName: currentUser.displayName || currentUser.email });
+      } catch {}
+    }
+    toast('✅ Bestellung angenommen! Jetzt abholen und liefern.');
+  } catch(e) { toast('Fehler: ' + e.message); }
+}
+
+function renderMyOrders(orders) {
+  const el = $('my-orders-list');
+  if (!orders.length) {
+    el.innerHTML = '<div class="empty-state"><div class="icon">🛵</div><p>Keine aktiven Lieferungen</p></div>';
+    return;
+  }
+  el.innerHTML = orders.map(o => {
+    const earn = driverEarning(o.totalPrice || 0);
+    const items = Object.entries(o.items || {}).map(([n,i]) => `${i.quantity}x ${n}`).join(', ');
+    const statusChip = o.status === 'unterwegs'
+      ? `<div class="chip rust"><span class="dot pulse" style="background:var(--rust)"></span> Unterwegs</div>`
+      : `<div class="chip green"><span class="dot" style="background:var(--green)"></span> ${o.status}</div>`;
+    return `
+    <div class="order-card">
+      <div class="header">
+        <div>
+          <div class="café-tag">${o.cafe || 'Café'}</div>
+          <div style="font-weight:700;font-size:1rem;margin-top:.2rem;">${fmt(o.totalPrice||0)}</div>
+        </div>
+        <div style="display:flex;flex-direction:column;align-items:flex-end;gap:.4rem;">
+          ${statusChip}
+          <div class="earning-tag" style="font-size:.8rem;">💰 ${fmt(earn)}</div>
+        </div>
+      </div>
+      <div class="items-list">${items}</div>
+      <div class="map-container"><div id="minimap-mine-${o.id}" class="map-mini"></div></div>
+      <div class="footer">
+        <div style="font-size:.8rem;color:var(--muted);flex:1;">📍 ${o.address || ''}</div>
+        <button class="accept-btn" data-deliver="${o.id}" data-uid="${o.userId||''}" data-earn="${earn}" data-addr="${(o.address||'').replace(/"/g,'&quot;')}">
+          Geliefert ✓
+        </button>
+      </div>
+    </div>`;
+  }).join('');
+
+  orders.forEach(o => {
+    if (o.address) drawMiniMap('minimap-mine-' + o.id, o.address, o.cafeCoords);
+  });
+
+  el.querySelectorAll('[data-deliver]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      openMapModal(btn.dataset.deliver, btn.dataset.uid, btn.dataset.addr, parseFloat(btn.dataset.earn||0));
+    });
+  });
+}
+
+function renderEarnings(done) {
+  const total = done.reduce((s, o) => s + driverEarning(o.totalPrice||0), 0);
+  driverBalance = total;
+  $('total-earnings').textContent = fmt(total);
+  $('driver-balance-badge').textContent = fmt(total);
+
+  const el = $('earnings-list');
+  if (!done.length) {
+    el.innerHTML = '<div class="empty-state" style="padding:1rem 0;"><div class="icon" style="font-size:2rem;">🏁</div><p>Noch keine abgeschlossenen Lieferungen</p></div>';
+    return;
+  }
+  el.innerHTML = done.map(o => {
+    const earn = driverEarning(o.totalPrice||0);
+    return `<div style="display:flex;justify-content:space-between;align-items:center;padding:.6rem 0;border-bottom:1px solid var(--border);">
+      <div>
+        <div style="font-size:.88rem;font-weight:600;">${o.cafe||'Bestellung'}</div>
+        <div style="font-size:.76rem;color:var(--muted);">${fmtDate(o.deliveredAt||o.createdAt)}</div>
+      </div>
+      <div style="font-weight:700;color:var(--green);">+${fmt(earn)}</div>
+    </div>`;
+  }).join('');
+}
+
+// ─── MAP MODAL ────────────────────────────────────────────────────────────────
+async function drawMiniMap(containerId, address, cafeCoords) {
+  await new Promise(r => setTimeout(r, 100));
+  const el = document.getElementById(containerId);
+  if (!el || el._mapInit) return;
+  el._mapInit = true;
+
+  // Standardkoordinaten Hamburg
+  const defaultCenter = [53.5511, 9.9937];
+  const m = L.map(el, { zoomControl: false, attributionControl: false, dragging: false, scrollWheelZoom: false, doubleClickZoom: false });
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(m);
+  m.setView(defaultCenter, 13);
+
+  // Geocode Kundenadresse
+  try {
+    const r = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(address)}&limit=1&accept-language=de`);
+    const d = await r.json();
+    if (d && d[0]) {
+      const custCoord = [parseFloat(d[0].lat), parseFloat(d[0].lon)];
+      // Café-Koordinaten (Defaults für Junge/Double)
+      const cafeC = cafeCoords || [53.5511, 9.9937];
+      const custMarker = L.circleMarker(custCoord, {radius:7, fillColor:'#c8441a', color:'#fff', weight:2, fillOpacity:1}).addTo(m);
+      const cafeMarker = L.circleMarker(cafeC, {radius:7, fillColor:'#1a7a4a', color:'#fff', weight:2, fillOpacity:1}).addTo(m);
+      // Linie Café → Kunde
+      L.polyline([cafeC, custCoord], {color:'#0f0f0f', weight:2.5, dashArray:'6,5', opacity:.7}).addTo(m);
+      const bounds = L.latLngBounds([cafeC, custCoord]);
+      m.fitBounds(bounds, {padding:[20,20]});
+    }
+  } catch {}
+}
+
+function openMapModal(orderId, userId, address, earn) {
+  modalOrderId = orderId;
+  modalUserId = userId;
+
+  $('modal-address').textContent = '📍 ' + address;
+  show('map-modal-backdrop');
+
+  // Init map in modal
+  setTimeout(async () => {
+    const el = $('map-modal');
+    if (el._map) { el._map.remove(); el._map = null; }
+    const m = L.map(el, { zoomControl: true, attributionControl: false });
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(m);
+    el._map = m;
+    m.setView([53.5511, 9.9937], 13);
+
+    try {
+      const r = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(address)}&limit=1`);
+      const d = await r.json();
+      if (d && d[0]) {
+        const custC = [parseFloat(d[0].lat), parseFloat(d[0].lon)];
+        const cafeC = [53.5511, 9.9937]; // Default Hamburg Zentrum
+        L.circleMarker(custC, {radius:10, fillColor:'#c8441a', color:'#fff', weight:2.5, fillOpacity:1}).addTo(m).bindPopup('Kunde');
+        L.circleMarker(cafeC, {radius:10, fillColor:'#1a7a4a', color:'#fff', weight:2.5, fillOpacity:1}).addTo(m).bindPopup('Café');
+        L.polyline([cafeC, custC], {color:'#0f0f0f', weight:3, dashArray:'8,6', opacity:.85}).addTo(m);
+        const bounds = L.latLngBounds([cafeC, custC]);
+        m.fitBounds(bounds, {padding:[30,30]});
+      }
+    } catch {}
+  }, 200);
+
+  $('modal-confirm-btn').onclick = () => confirmDelivery(orderId, userId, earn);
+}
+
+window.closeMapModal = () => {
+  hide('map-modal-backdrop');
+  const el = $('map-modal');
+  if (el && el._map) { el._map.remove(); el._map = null; }
+};
+
+async function confirmDelivery(orderId, userId, earn) {
+  try {
+    const ref = doc(db, 'artifacts', APP_ID, 'public_orders', orderId);
+    await updateDoc(ref, {
+      status: 'geliefert',
+      deliveredAt: new Date().toISOString()
+    });
+    if (userId) {
+      try {
+        const userRef = doc(db, 'artifacts', APP_ID, 'users', userId, 'orders', orderId);
+        await updateDoc(userRef, { status: 'geliefert' });
+      } catch {}
+    }
+    closeMapModal();
+    toast(`🎉 Geliefert! +${fmt(earn)} auf dein Konto`);
+  } catch(e) { toast('Fehler: ' + e.message); }
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// ─── RESTAURANT LOGIC ─────────────────────────────────────────────────────────
+// ══════════════════════════════════════════════════════════════════════════════
+
+// Eingebettetes Standard-Sortiment (Fallback)
+const DEFAULT_MENU = {
+  junge: [
+    {name:'Espresso',price:1.90,emoji:'☕',cat:'Kaffee',desc:'Klein & kräftig'},
+    {name:'Cappuccino klein',price:2.60,emoji:'🥛',cat:'Kaffee',desc:'~200 ml'},
+    {name:'Cappuccino groß',price:3.10,emoji:'🥛',cat:'Kaffee',desc:'~350 ml'},
+    {name:'Latte Macchiato',price:3.50,emoji:'🥛',cat:'Kaffee',desc:'Mild oder kräftig'},
+    {name:'Franzbrötchen',price:1.20,emoji:'🥐',cat:'Backwaren',desc:'Hamburger Original'},
+    {name:'Croissant',price:1.60,emoji:'🥐',cat:'Backwaren',desc:'Buttrig & knusprig'},
+  ],
+  double: [
+    {name:'Espresso',price:2.50,emoji:'☕',cat:'Kaffee',desc:'Kräftig & aromatisch'},
+    {name:'Cappuccino klein',price:3.20,emoji:'🥛',cat:'Kaffee',desc:'200 ml'},
+    {name:'Flat White',price:3.50,emoji:'🤎',cat:'Kaffee',desc:'Stark & seidig'},
+    {name:'Cold Brew',price:4.20,emoji:'🧊',cat:'Kaffee',desc:'12h kalt gebrüht'},
+    {name:'Croissant',price:2.20,emoji:'🥐',cat:'Kuchen & Süßes',desc:'Hausgemacht'},
+  ]
+};
+
+let menuUnsub = null;
+
+function startRestaurant() {
+  loadRestaurantOrders();
+  loadRestaurantMenu('junge');
+
+  $('rest-cafe-select').addEventListener('change', e => {
+    restCafe = e.target.value;
+    $('rest-cafe-title').textContent = restCafe === 'junge' ? 'Stadtbäckerei Junge' : 'Double Coffee';
+    loadRestaurantMenu(restCafe);
+  });
+}
+
+function loadRestaurantOrders() {
+  const ref = collection(db, 'artifacts', APP_ID, 'public_orders');
+  const u = onSnapshot(ref, snap => {
+    const orders = [];
+    snap.forEach(d => orders.push({ id: d.id, ...d.data() }));
+    orders.sort((a,b) => new Date(b.createdAt) - new Date(a.createdAt));
+    renderRestOrders(orders);
+    // Stats
+    const active = orders.filter(o => o.status !== 'geliefert').length;
+    const delivered = orders.filter(o => o.status === 'geliefert').length;
+    const revenue = orders.filter(o => o.status === 'geliefert').reduce((s,o) => s + (o.totalPrice||0), 0);
+    $('stat-total-orders').textContent = orders.length;
+    $('stat-revenue').textContent = fmt(revenue);
+    $('stat-active').textContent = active;
+    $('stat-delivered').textContent = delivered;
+    // Badge
+    if (active > 0) { $('rest-orders-badge').textContent = active; $('rest-orders-badge').style.display = ''; }
+    else $('rest-orders-badge').style.display = 'none';
+    // Stats list
+    renderStatOrders(orders.slice(0, 10));
+  });
+  unsubs.push(u);
+}
+
+function renderRestOrders(orders) {
+  const el = $('rest-orders-list');
+  if (!orders.length) {
+    el.innerHTML = '<div class="empty-state"><div class="icon">📭</div><p>Keine Bestellungen</p></div>';
+    return;
+  }
+
+  const statusColor = { aktiv: 'rust', unterwegs: 'gold', geliefert: 'green' };
+  const statusLabel = { aktiv: 'Neu', unterwegs: 'Unterwegs 🛵', geliefert: 'Geliefert ✓' };
+
+  el.innerHTML = orders.map(o => {
+    const st = o.status || 'aktiv';
+    const items = Object.entries(o.items || {}).map(([n,i]) => `<div style="margin-bottom:.2rem;">• ${i.quantity}x ${n}</div>`).join('');
+    const pulse = st === 'aktiv' ? `<span class="dot pulse" style="background:var(--rust)"></span> ` : '';
+    return `
+    <div class="order-card ${st === 'aktiv' ? 'order-incoming' : ''}">
+      <div class="header">
+        <div>
+          <div class="café-tag">${o.cafe || '–'}</div>
+          <div style="font-weight:700;font-size:1rem;margin-top:.15rem;">${fmt(o.totalPrice||0)}</div>
+          <div style="font-size:.76rem;color:var(--muted);margin-top:.1rem;">${fmtDate(o.createdAt)}</div>
+        </div>
+        <div class="chip ${statusColor[st] || 'gray'}">${pulse}${statusLabel[st] || st}</div>
+      </div>
+      <div class="items-list" style="font-size:.85rem;">${items}</div>
+      <div style="padding:.6rem 1.1rem .9rem;font-size:.8rem;color:var(--muted);">
+        📍 ${o.address || '–'} ${o.notes ? `· 📝 ${o.notes}` : ''}
+        ${o.driverName ? `<br>🛵 Fahrer: ${o.driverName}` : ''}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function renderStatOrders(orders) {
+  const el = $('stat-orders-list');
+  el.innerHTML = orders.map(o => `
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:.5rem 0;border-bottom:1px solid var(--border);">
+      <div>
+        <div style="font-size:.85rem;font-weight:600;">${o.cafe||'–'} · ${fmt(o.totalPrice||0)}</div>
+        <div style="font-size:.73rem;color:var(--muted);">${fmtDate(o.createdAt)}</div>
+      </div>
+      <div class="chip ${o.status==='geliefert'?'green':o.status==='unterwegs'?'gold':'rust'}" style="font-size:.72rem;">
+        ${o.status==='geliefert'?'✓':o.status==='unterwegs'?'🛵':'Neu'}
+      </div>
+    </div>`).join('') || '<p style="color:var(--muted);font-size:.85rem;">Keine Daten</p>';
+}
+
+function loadRestaurantMenu(cafeId) {
+  if (menuUnsub) { menuUnsub(); menuUnsub = null; }
+  const ref = collection(db, 'artifacts', APP_ID, 'restaurant_menus', cafeId, 'items');
+
+  menuUnsub = onSnapshot(ref, async snap => {
+    let items = [];
+    if (snap.empty) {
+      // Erst-Befüllung mit Default-Menü
+      const defaults = DEFAULT_MENU[cafeId] || [];
+      for (const item of defaults) {
+        await addDoc(ref, item);
+      }
+      return; // onSnapshot feuert nochmal
+    }
+    snap.forEach(d => items.push({ id: d.id, ...d.data() }));
+    items.sort((a,b) => (a.cat||'').localeCompare(b.cat||'') || (a.name||'').localeCompare(b.name||''));
+    $('menu-count').textContent = items.length;
+    renderMenuItems(items, cafeId);
+  });
+
+  unsubs.push(() => { if(menuUnsub) menuUnsub(); });
+}
+
+function renderMenuItems(items, cafeId) {
+  const el = $('menu-items-list');
+  if (!items.length) {
+    el.innerHTML = '<p style="color:var(--muted);font-size:.85rem;padding:.5rem 0;">Noch keine Artikel. Füge unten welche hinzu.</p>';
+    return;
+  }
+
+  let lastCat = null;
+  el.innerHTML = items.map(item => {
+    let catHeader = '';
+    if (item.cat !== lastCat) {
+      lastCat = item.cat;
+      catHeader = `<div style="font-size:.72rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin:1rem 0 .4rem;padding-top:${lastCat !== item.cat ? '.5rem' : '0'};">${item.cat || 'Sonstiges'}</div>`;
+    }
+    return catHeader + `
+    <div class="menu-item-row" data-item-id="${item.id}">
+      <div class="emoji">${item.emoji || '☕'}</div>
+      <div class="info">
+        <div class="name">${item.name}</div>
+        <div class="cat">${item.desc || ''}</div>
+      </div>
+      <div class="price">${fmt(item.price||0)}</div>
+      <button class="del-btn" data-del="${item.id}" data-cafe="${cafeId}" title="Artikel löschen">✕</button>
+    </div>`;
+  }).join('');
+
+  el.querySelectorAll('[data-del]').forEach(btn => {
+    btn.addEventListener('click', () => deleteMenuItem(btn.dataset.cafe, btn.dataset.del));
+  });
+}
+
+async function deleteMenuItem(cafeId, itemId) {
+  if (!confirm('Artikel wirklich löschen?')) return;
+  try {
+    await deleteDoc(doc(db, 'artifacts', APP_ID, 'restaurant_menus', cafeId, 'items', itemId));
+    toast('Artikel gelöscht');
+  } catch(e) { toast('Fehler: ' + e.message); }
+}
+
+$('add-item-btn').addEventListener('click', async () => {
+  const name  = $('new-name').value.trim();
+  const emoji = $('new-emoji').value.trim() || '☕';
+  const price = parseFloat($('new-price').value);
+  const cat   = $('new-cat').value.trim() || 'Sonstiges';
+  const desc  = $('new-desc').value.trim();
+
+  if (!name || isNaN(price)) return toast('Name und Preis sind Pflichtfelder!');
+
+  const cafeId = $('rest-cafe-select').value;
+  const ref = collection(db, 'artifacts', APP_ID, 'restaurant_menus', cafeId, 'items');
+  try {
+    await addDoc(ref, { name, emoji, price, cat, desc, createdAt: new Date().toISOString() });
+    // Felder leeren
+    ['new-name','new-emoji','new-price','new-cat','new-desc'].forEach(id => $(id).value = '');
+    toast('✅ Artikel hinzugefügt!');
+  } catch(e) { toast('Fehler: ' + e.message); }
+});
+
+// Splash weg nach 2.2s (auth-observer übernimmt)
+setTimeout(() => {
+  const loader = $('loader');
+  loader.style.opacity = '0';
+  setTimeout(() => loader.classList.add('hide'), 500);
+}, 2200);
+</script>
+
+</body>
+</html>
 
